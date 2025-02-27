@@ -42,7 +42,7 @@ def analyze_image(image_file,prompt, response_schema=None) -> str | None:
     if response_schema:
         print(f"Orig type:{type(response_schema)}")
         response = client.models.generate_content(
-            model='gemini-1.5-pro',
+            model='gemini-2.0-flash',
             contents=[
                 image,
                 prompt,
@@ -54,7 +54,7 @@ def analyze_image(image_file,prompt, response_schema=None) -> str | None:
         )
     else:
         response = client.models.generate_content(
-            model='gemini-1.5-pro',
+            model='gemini-2.0-flash',
             contents=[
                 image,
                 prompt,

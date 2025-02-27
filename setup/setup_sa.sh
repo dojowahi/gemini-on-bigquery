@@ -11,6 +11,7 @@
 
 source ./config.sh
 gcloud auth login ${USER_EMAIL}
+
 echo "Assigning IAM Permissions"
 gcloud config set project ${PROJECT_ID}
 
@@ -48,7 +49,8 @@ echo "Compute engine SA - ${SERVICE_ACCOUNT}"
 
 gcloud projects add-iam-policy-binding ${PROJECT_ID} \
     --member=serviceAccount:${SERVICE_ACCOUNT} \
-    --role=roles/serviceusage.serviceUsageAdmin
+    --role=roles/serviceusage.serviceUsageAdmin \
+    --role=roles/aiplatform.admin
 
 sleep 15
 
@@ -68,7 +70,7 @@ echo "GCF SA: ${gcf_sa}"
 
 
 #Create the external connection for BQ
-bq mk -d ${BQ_DATASET}
+bq --location=${REGION} mk -d ${BQ_DATASET}
 
 bq mk --connection --display_name='gcf_ext_conn' \
       --connection_type=CLOUD_RESOURCE \
@@ -77,26 +79,33 @@ bq mk --connection --display_name='gcf_ext_conn' \
 
 #Get serviceAccountID associated with the connection  
 
-serviceAccountId=`bq show --location=US --connection --format=json gcf-ee-conn| jq -r '.cloudResource.serviceAccountId'`
+serviceAccountId=`bq show --location=${REGION} --connection --format=json  ${bq_ext_conn}| jq -r '.cloudResource.serviceAccountId'`
 echo "Service Account: ${serviceAccountId}"
 
 # Add Cloud run admin
 gcloud projects add-iam-policy-binding \
 $(gcloud config get-value project) \
 --member='serviceAccount:'${serviceAccountId} \
---role='roles/run.admin'
+--role='roles/run.admin' \
+--role='roles/storage.objectViewer'
+
+gcloud projects add-iam-policy-binding  \
+$(gcloud config get-value project) \
+--member='serviceAccount:'${gcf_sa} \
+--role=roles/cloudbuild.builds.builder
 
 bucket_name=${RANDOM}-${PROJECT_ID}
 
-tbl_def="gs://${bucket_name}@${REGION}.${bq_ext_conn}"
+tbl_def="gs://${bucket_name}/*@${REGION}.${bq_ext_conn}"
+
+gcloud storage buckets create gs://${bucket_name} --location=${REGION}
 
 bq mk --table \
 --external_table_definition=${tbl_def} \
---object_metadata=SIMPLE \
---max_staleness=INTERVAL 1800 SECOND \
---metadata_cache_mode=AUTOMATIC \
-${PROJECT_ID}:${DATASET_ID}.img_analysis
+--object_metadata=SIMPLE  \
+${PROJECT_ID}:${BQ_DATASET}.gemini_obj_img
 
-echo "export gcf_sa=${gcf_sa}" >> ~/gemini-on-bigquery/config.sh
-echo "export bucket_name=${bucket_name}" >> ~/gemini-on-bigquery/config.sh
+echo "export gcf_sa=${gcf_sa}" >> ~/gemini-on-bigquery/setup/config.sh
+echo "export bucket_name=${bucket_name}" >> ~/gemini-on-bigquery/setup/config.sh
+echo "export bq_ext_conn=${bq_ext_conn}" >> ~/gemini-on-bigquery/setup/config.sh
 
