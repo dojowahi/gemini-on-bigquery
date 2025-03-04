@@ -8,7 +8,7 @@ from google import genai
 from google.genai.types import GenerateContentConfig, Part
 
 PROJECT_ID = os.environ.get("PROJECT_ID",'gen-ai-4all')
-LOCATION = os.environ.get("GOOGLE_CLOUD_REGION", "us-central1")
+LOCATION = os.environ.get("REGION", "us-central1")
 print(f"PROJECT_ID,{PROJECT_ID}")
 client = genai.Client(vertexai=True, project=PROJECT_ID, location=LOCATION)
 

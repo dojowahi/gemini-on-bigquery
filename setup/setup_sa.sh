@@ -38,31 +38,74 @@ gcloud services enable artifactregistry.googleapis.com
 
 gcloud services enable run.googleapis.com
 
+gcloud services enable aiplatform.googleapis.com
+
 gcloud services enable cloudbuild.googleapis.com
 
 PROJECT_NUMBER=$(gcloud projects list --filter="project_id:${PROJECT_ID}"  --format='value(project_number)')
 
 
 
-SERVICE_ACCOUNT=${PROJECT_NUMBER}-compute@developer.gserviceaccount.com 
-echo "Compute engine SA - ${SERVICE_ACCOUNT}"
+# SERVICE_ACCOUNT=${PROJECT_NUMBER}-compute@developer.gserviceaccount.com 
+# echo "Compute engine SA - ${SERVICE_ACCOUNT}"
+
+cf_sa_name="gemini-on-bq"
+gcloud iam service-accounts create ${cf_sa_name} \
+  --description="Deploy Cloud Functions and access Gemini" \
+  --display-name="Gemini on BQ"
+
+SERVICE_ACCOUNT="${cf_sa_name}@${PROJECT_ID}.iam.gserviceaccount.com"
+COMPUTE_SERVICE_ACCOUNT=${PROJECT_NUMBER}-compute@developer.gserviceaccount.com 
+echo "Compute engine SA - ${COMPUTE_SERVICE_ACCOUNT}"
 
 gcloud projects add-iam-policy-binding ${PROJECT_ID} \
     --member=serviceAccount:${SERVICE_ACCOUNT} \
-    --role=roles/serviceusage.serviceUsageAdmin \
+    --role=roles/serviceusage.serviceUsageAdmin 
+
+gcloud projects add-iam-policy-binding ${PROJECT_ID} \
+    --member=serviceAccount:${SERVICE_ACCOUNT} \
     --role=roles/aiplatform.admin
+
+gcloud projects add-iam-policy-binding ${PROJECT_ID} \
+    --member=serviceAccount:${SERVICE_ACCOUNT} \ 
+    --role=roles/cloudfunctions.admin 
+
+gcloud projects add-iam-policy-binding ${PROJECT_ID} \
+    --member=serviceAccount:${SERVICE_ACCOUNT} \
+    --role=roles/run.invoker 
+
+gcloud projects add-iam-policy-binding ${PROJECT_ID} \
+    --member=serviceAccount:${SERVICE_ACCOUNT} \
+    --role=roles/storage.objectAdmin 
+
+gcloud projects add-iam-policy-binding ${PROJECT_ID} \
+    --member=serviceAccount:${SERVICE_ACCOUNT} \
+    --role=roles/aiplatform.user 
+
+gcloud projects add-iam-policy-binding ${PROJECT_ID} \
+    --member=serviceAccount:${SERVICE_ACCOUNT} \
+    --role=roles/aiplatform.serviceAgent 
+
+gcloud projects add-iam-policy-binding ${PROJECT_ID} \
+    --member=serviceAccount:${SERVICE_ACCOUNT} \
+    --role=roles/iam.serviceAccountUser 
+
+gcloud projects add-iam-policy-binding ${PROJECT_ID} \
+    --member=serviceAccount:${SERVICE_ACCOUNT} \
+    --role=roles/aiplatform.expressAdmin 
+
 
 sleep 15
 
-# gcloud iam service-accounts keys create ~/eeKey.json --iam-account ${SERVICE_ACCOUNT}
-# cd ~/
-# cp eeKey.json ~/earth-engine-on-bigquery/src/cloud-functions/ndvi/
-# cp eeKey.json ~/earth-engine-on-bigquery/src/cloud-functions/temperature/
-# cp eeKey.json ~/earth-engine-on-bigquery/src/cloud-functions/crop/
+gcloud projects add-iam-policy-binding ${PROJECT_ID} \
+    --member=serviceAccount:${COMPUTE_SERVICE_ACCOUNT} \
+    --role=roles/logging.logWriter
 
-# Cloud function setup for EE
+gcloud projects add-iam-policy-binding ${PROJECT_ID} \
+    --member=serviceAccount:${COMPUTE_SERVICE_ACCOUNT} \
+    --role=roles/cloudbuild.builds.builder 
 
-project_id=${PROJECT_ID}
+sleep 15
 
 gcf_sa=${SERVICE_ACCOUNT}
 
@@ -89,10 +132,6 @@ $(gcloud config get-value project) \
 --role='roles/run.admin' \
 --role='roles/storage.objectViewer'
 
-gcloud projects add-iam-policy-binding  \
-$(gcloud config get-value project) \
---member='serviceAccount:'${gcf_sa} \
---role=roles/cloudbuild.builds.builder
 
 bucket_name=${RANDOM}-${PROJECT_ID}
 
